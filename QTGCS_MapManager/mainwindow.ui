@@ -89,10 +89,13 @@
      </rect>
     </property>
     <property name="minimum">
-     <number>3</number>
+     <number>9</number>
     </property>
     <property name="maximum">
      <number>21</number>
+    </property>
+    <property name="value">
+     <number>19</number>
     </property>
     <property name="orientation">
      <enum>Qt::Vertical</enum>
@@ -114,10 +117,13 @@
      </rect>
     </property>
     <property name="minimum">
-     <number>3</number>
+     <number>9</number>
     </property>
     <property name="maximum">
      <number>21</number>
+    </property>
+    <property name="value">
+     <number>19</number>
     </property>
     <property name="orientation">
      <enum>Qt::Vertical</enum>

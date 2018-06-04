@@ -37,8 +37,8 @@ void MainWindow::InitToolBox()
     ui->manageLevelSlider->move(645,390);
     ui->currentLevelLabel->move(640,170);
     ui->manageLevelLabel->move(640,360);
-    ui->currentLevelLabel->setText("C. L.\n  3");
-    ui->manageLevelLabel->setText("M. L.\n  3");
+    ui->currentLevelLabel->setText("C. L.\n  " + QString::number(ui->currentLevelSlider->value(),10));
+    ui->manageLevelLabel->setText("M. L.\n  " + QString::number(ui->manageLevelSlider->value(),10));
 }
 
 void MainWindow::InitMap()
@@ -66,11 +66,10 @@ void MainWindow::InitMap()
 
 void MainWindow::updatePaint()
 {
-    QPixmap tempMap = mapHandle->retImage;
+    QPixmap tempMap = mapHandle->retImage.scaled(QSize(640,640));
 
     if (tempMap.isNull())
     {
-        //QString currentWorkingPath = QDir::currentPath();
         QString blackPath = resourcePath + "/res/black.jpg";
         imageHandle->load(blackPath);
     }
@@ -78,6 +77,7 @@ void MainWindow::updatePaint()
     {
         imageHandle = &tempMap;
     }
+
     QPainter painter(imageHandle);
 
     draw(&painter);
@@ -97,7 +97,6 @@ void MainWindow::draw(QPainter *painter)
     int spacer = 640/divider;
     for (uint i = 0; i<=divider; i++)
     {
-        qDebug() << i;
         ppVector.append(QPoint(i*spacer, 0));
         ppVector.append(QPoint(i*spacer, 640));
         ppVector.append(QPoint(0, i*spacer));
@@ -119,12 +118,25 @@ void MainWindow::createStatusBar()
 
 void MainWindow::on_plusButton_clicked()
 {
+    if (mapHandle->_zoomlevel <= 21)
+    {
+        mapHandle->zoom(1);
+        int manageLevelValue = ui->manageLevelSlider->value() + 1;
+        ui->manageLevelSlider->setValue(manageLevelValue);
+        emit paintRequest();
+    }
 
 }
 
 void MainWindow::on_minusButton_clicked()
 {
-
+    if (mapHandle->_zoomlevel >= 9)
+    {
+        mapHandle->zoom(-1);
+        int manageLevelValue = ui->manageLevelSlider->value() - 1;
+        ui->manageLevelSlider->setValue(manageLevelValue);
+        emit paintRequest();
+    }
 }
 
 void MainWindow::on_downloadButton_clicked()
@@ -140,11 +152,21 @@ void MainWindow::on_returnButton_clicked()
 void MainWindow::on_currentLevelSlider_valueChanged(int value)
 {
     ui->currentLevelLabel->setText("C. L.\n  "+QString::number(value,10));
+    emit paintRequest();
 }
 
 void MainWindow::on_manageLevelSlider_valueChanged(int value)
 {
     ui->manageLevelLabel->setText("M. L.\n  "+QString::number(value,10));
+    if (value - ui->currentLevelSlider->value() < 0)
+    {
+        ui->currentLevelSlider->setValue(value);
+    }
+    if (value - ui->currentLevelSlider->value() > 3)
+    {
+        ui->currentLevelSlider->setValue(value-3);
+    }
+    emit paintRequest();
 }
 
 // mouse events
