@@ -8,6 +8,10 @@
 #include <QImage>
 #include <QFile>
 #include <QJsonDocument>
+#include <QMouseEvent>
+
+#include "fileio.h"
+#include "map.h"
 
 namespace Ui {
 class MainWindow;
@@ -22,15 +26,29 @@ public:
     ~MainWindow();
     void InitToolBox();
     void InitMap();
-    QPixmap imageHandle;
+    Map* mapHandle;
+    QPixmap* imageHandle;
+    //QPixmap imageHandle;
     void createStatusBar();
     QString currentWorkingPath;
     QString cfgFilePath;
     QString resourcePath;
     QString xbeeAddrPath;
-    QByteArray readJsonFile(const QString &filename);
+    bool inMapFlag;
+    bool leftDown;
+    bool rightDown;
+    int mouseX;
+    int mouseY;
+    void mousePressEvent(QMouseEvent *event);
+    void mouseReleaseEvent ( QMouseEvent * event );
+    void mouseMoveEvent ( QMouseEvent * event );
+    //QByteArray readJsonFile(const QString &filename);
 protected:
     //void resizeEvent(QResizeEvent *event) override;
+signals:
+    void paintRequest();
+public slots:
+    void updatePaint();
 private slots:
     void on_plusButton_clicked();
 
@@ -39,6 +57,10 @@ private slots:
     void on_downloadButton_clicked();
 
     void on_returnButton_clicked();
+
+    void on_currentLevelSlider_valueChanged(int value);
+
+    void on_manageLevelSlider_valueChanged(int value);
 
 private:
     Ui::MainWindow *ui;
