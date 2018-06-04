@@ -78,11 +78,32 @@ void MainWindow::updatePaint()
     {
         imageHandle = &tempMap;
     }
-    //QPainter painter(imageHandle);
+    QPainter painter(imageHandle);
 
-    //draw(&painter);
+    draw(&painter);
     ui->mapLabel->setPixmap(*imageHandle);
     this->repaint();
+}
+
+void MainWindow::draw(QPainter *painter)
+{
+    QPen Red((QColor::fromRgb(255,0,0)),10);
+    QPen YellowDot((QColor::fromRgb(255,255,0)),10);
+    QPen GreenLine((QColor::fromRgb(0,255,0)),1);
+    QPen BlueLine((QColor::fromRgb(0,0,255)),1);
+    painter->setPen(GreenLine);
+    QVector<QPoint> ppVector;
+    int divider = 8;
+    int spacer = 640/divider;
+    for (uint i = 0; i<=divider; i++)
+    {
+        qDebug() << i;
+        ppVector.append(QPoint(i*spacer, 0));
+        ppVector.append(QPoint(i*spacer, 640));
+        ppVector.append(QPoint(0, i*spacer));
+        ppVector.append(QPoint(640, i*spacer));
+    }
+    painter->drawLines(ppVector);
 }
 
 void MainWindow::createStatusBar()

@@ -9,6 +9,7 @@
 #include <QFile>
 #include <QJsonDocument>
 #include <QMouseEvent>
+#include <QPainter>
 
 #include "fileio.h"
 #include "map.h"
@@ -42,7 +43,8 @@ public:
     void mousePressEvent(QMouseEvent *event);
     void mouseReleaseEvent ( QMouseEvent * event );
     void mouseMoveEvent ( QMouseEvent * event );
-    //QByteArray readJsonFile(const QString &filename);
+    void draw(QPainter *painter);
+
 protected:
     //void resizeEvent(QResizeEvent *event) override;
 signals:
