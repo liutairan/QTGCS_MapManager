@@ -66,7 +66,7 @@ void MainWindow::InitMap()
 
 void MainWindow::updatePaint()
 {
-    QPixmap tempMap = mapHandle->retImage.scaled(QSize(640,640));
+    QPixmap tempMap = mapHandle->retViewImage.scaled(QSize(640,640));
 
     if (tempMap.isNull())
     {
@@ -153,9 +153,9 @@ void MainWindow::on_currentLevelSlider_valueChanged(int value)
 {
     int currentViewLevel = mapHandle->_viewlevel;
     ui->currentLevelLabel->setText("C. L.\n  "+QString::number(value,10));
-    if (value - ui->manageLevelSlider->value() < -3)
+    if (value - ui->manageLevelSlider->value() < -2)
     {
-        ui->manageLevelSlider->setValue(value+3);
+        ui->manageLevelSlider->setValue(value+2);
     }
     if (value - ui->manageLevelSlider->value() > 0)
     {
@@ -176,9 +176,9 @@ void MainWindow::on_manageLevelSlider_valueChanged(int value)
     {
         ui->currentLevelSlider->setValue(value);
     }
-    if (value - ui->currentLevelSlider->value() > 3)
+    if (value - ui->currentLevelSlider->value() > 2)
     {
-        ui->currentLevelSlider->setValue(value-3);
+        ui->currentLevelSlider->setValue(value-2);
     }
     if ((value >=9) && (value <=21))
     {

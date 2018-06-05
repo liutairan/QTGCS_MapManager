@@ -33,7 +33,8 @@ Map::Map(double lat, double lon, int level, int width, int height, QObject *pare
 
     initPath();
     _init_tile_index();
-    loadImage();
+    //loadImage();
+    loadViewImage();
 }
 
 //QByteArray readJsonFile(const QString &filename)
@@ -81,7 +82,8 @@ void Map::move(int dx, int dy)
     double local_dy_to_lat = dy * tempStep._latStep/(1.0*_TILESIZE);
     _centerLat = _centerLat + local_dy_to_lat;
     _centerLon = _centerLon - local_dx_to_lon;
-    loadImage();
+    //loadImage();
+    loadViewImage();
 }
 
 void Map::zoom(int dlevel)
@@ -95,7 +97,8 @@ void Map::zoom(int dlevel)
     {
         _zoomlevel = 9;
     }
-    loadImage();
+    //loadImage();
+    loadViewImage();
 }
 
 void Map::viewZoom(int dlevel)
@@ -109,7 +112,11 @@ void Map::viewZoom(int dlevel)
     {
         _viewlevel = 9;
     }
-    qDebug() << _viewlevel;
+    viewWidth = _width*qPow(2, _zoomlevel-_viewlevel);
+    viewHeight = _height*qPow(2, _zoomlevel-_viewlevel);
+
+    //loadImage();
+    loadViewImage();
 }
 
 void Map::loadImage()
@@ -146,6 +153,62 @@ void Map::loadImage()
     }
     catch (...)
     {}
+}
+
+void Map::loadViewImage()
+{
+    QStringList filters;
+    filters << "*.jpg";
+
+    QFileInfoList fileInfoList = QDir(cacheFolder).entryInfoList(filters, QDir::Files|QDir::NoDotAndDotDot);
+    for (int i = 0; i < fileInfoList.size(); i++)
+    {
+        QFileInfo fileInfo = fileInfoList.at(i);
+        //qDebug() << fileInfo.fileName();
+    }
+
+    try
+    {
+        StitchTileInfo tempTileInfo = localLoadViewImage();
+        if (tempTileInfo.missingTiles.isEmpty())
+        {
+            //qDebug() << "Exist";
+        }
+        else if (tempTileInfo.missingTiles.length() > 0)
+        {
+            //qDebug() << "Not exist";
+            // Comment out web download image for testing, change back later
+            //webLoadImage(tempTileInfo);
+            StitchTileInfo dump = localLoadViewImage();
+        }
+        else
+        {
+            qDebug() << "Error: Unknown state";
+        }
+    }
+    catch (...)
+    {}
+}
+
+StitchTileInfo Map::localLoadViewImage()
+{
+    StitchTileInfo tempTileInfo = _findLocalViewImage();
+    if(tempTileInfo.missingTiles.length() > 0)
+    {
+        // Some tiles not exist locally, fill with black image temporarily
+        ImageWithBorder tempImageAndBorder = _stitchViewImagesF(tempTileInfo);
+        QPixmap tempImage = _cropViewImage(tempImageAndBorder);
+        retViewImage = tempImage;
+        return tempTileInfo;
+    }
+    else if (tempTileInfo.localTiles.length() == 25)
+    {
+        ImageWithBorder tempImageAndBorder = _stitchViewImages(tempTileInfo);
+        QPixmap tempImage = _cropViewImage(tempImageAndBorder);
+        retViewImage = tempImage;
+        return tempTileInfo;
+    }
+    return tempTileInfo;
 }
 
 StitchTileInfo Map::localLoadImage()
@@ -514,6 +577,67 @@ StitchTileInfo Map::_findImages(QList<CacheAreaInfo> areaList)
     return retTileInfo;
 }
 
+StitchTileInfo Map::_findViewImages(QList<CacheAreaInfo> areaList)
+{
+    double lat = _centerLat;
+    double lon = _centerLon;
+    int zoom = _zoomlevel;
+    int view = _viewlevel;
+
+    TileIndex tempIndex = _pos_to_tile_index(lat,lon,zoom);
+    int x_ind = tempIndex.x;
+    int y_ind = tempIndex.y;
+    //qDebug() << zoom<<x_ind<<y_ind;
+    QList<TileIndex> waitingTiles;
+
+    TileIndex tempTile[25];
+    for (uint i=0; i<25;i++)
+    {
+        int row_num = int(i/5);
+        int col_num = i%5;
+        tempTile[i].x = x_ind + col_num - 2;
+        tempTile[i].y = y_ind + 2 - row_num;
+        tempTile[i].zoomlevel = zoom;
+        waitingTiles.append(tempTile[i]);
+    }
+
+    StitchTileInfo retTileInfo;
+    //qDebug() << areaList.length();
+    if (areaList.length() == 0)
+    {
+        retTileInfo.missingTiles = waitingTiles;
+    }
+    else
+    {
+        for (int i=0; i<25; i++)
+        {
+            TileIndex tocheck = waitingTiles[i];
+            //qDebug() << tocheck.zoomlevel << tocheck.x << tocheck.y;
+            int res = 0;
+            CacheAreaInfo tempCacheArea;
+            foreach (tempCacheArea,areaList)
+            {
+                //qDebug() << tocheck.zoomlevel << tempCacheArea.zoomlevel;
+                if ((tempCacheArea.zoomlevel == tocheck.zoomlevel) && (tempCacheArea.indexX == tocheck.x) && (tempCacheArea.indexY == tocheck.y))
+                {
+                    res = 1;
+                    break;
+                }
+            }
+            //qDebug() << res;
+            if (res == 0)
+            {
+                retTileInfo.missingTiles << tocheck;
+            }
+            else
+            {
+                retTileInfo.localTiles << tocheck;
+            }
+        }
+    }
+    return retTileInfo;
+}
+
 StitchTileInfo Map::_findLocalImage()
 {
     QList<CacheAreaInfo> localAreas;
@@ -550,6 +674,42 @@ StitchTileInfo Map::_findLocalImage()
     return tempStitchTileInfo;
 }
 
+StitchTileInfo Map::_findLocalViewImage()
+{
+    QList<CacheAreaInfo> localAreas;
+    try
+    {
+        QFile file(cacheIndex);
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+        {
+            ;
+        }
+        QTextStream in(&file);
+        QString line = in.readLine();
+        while (!line.isNull())
+        {
+            CacheAreaInfo tempCacheAreaInfo;
+            tempCacheAreaInfo.lat = line.split(" ").at(0).toDouble();
+            tempCacheAreaInfo.lon = line.split(" ").at(1).toDouble();
+            tempCacheAreaInfo.zoomlevel = line.split(" ").at(2).toInt();
+            tempCacheAreaInfo.type = line.split(" ").at(3);
+            tempCacheAreaInfo.indexX = line.split(" ").at(4).toInt();
+            tempCacheAreaInfo.indexY = line.split(" ").at(5).toInt();
+            localAreas.append(tempCacheAreaInfo);
+            // read next line
+            line = in.readLine();
+        }
+        file.close();
+    }
+    catch (...)
+    {
+        qDebug() << "No local image";
+    }
+    StitchTileInfo tempStitchTileInfo;
+    tempStitchTileInfo = _findViewImages(localAreas);
+    return tempStitchTileInfo;
+}
+
 ImageWithBorder Map::_stitchImages(StitchTileInfo tilesInfo)
 {
     int ntiles = 3;
@@ -565,6 +725,66 @@ ImageWithBorder Map::_stitchImages(StitchTileInfo tilesInfo)
     {
         int row_num = int(i/3);
         int col_num = i%3;
+
+        int x_ind = tilesInfo.localTiles.at(i).x;
+        int y_ind = tilesInfo.localTiles.at(i).y;
+
+        double lat = geoDictList.at(_zoomlevel-9).latList.at(y_ind);
+        double lon = geoDictList.at(_zoomlevel-9).lonList.at(x_ind);
+        double lat_rounded = _round_to(lat,6);
+        double lon_rounded = _round_to(lon,6);
+        //qDebug() << qSetRealNumberPrecision( 10 ) << x_ind << y_ind << lat << lon;
+        if (lat_rounded > max_lat)
+        {
+            max_lat = lat_rounded;
+        }
+        if (lat_rounded < min_lat)
+        {
+            min_lat = lat_rounded;
+        }
+        if (lon_rounded > max_lon)
+        {
+            max_lon = lon_rounded;
+        }
+        if (lon_rounded < min_lon)
+        {
+            min_lon = lon_rounded;
+        }
+        QString strLat = QString::number(lat_rounded, 'f', 6);
+        QString strLon = QString::number(lon_rounded, 'f', 6);
+        QString strZoomLevel = QString::number(_zoomlevel, 10);
+        QString strWidth = QString::number(_width, 10);
+        QString strHeight = QString::number(_height, 10);
+        QString tempName = strLat+"_"+strLon+"_"+strZoomLevel+"_"+_maptype+"_"+strWidth+"_"+strHeight+".jpg";
+
+        QPixmap tile;
+        tile.load(cacheFolder + tempName);
+        painter.drawPixmap(col_num *_TILESIZE, row_num *_TILESIZE, tile);
+    }
+    ImageWithBorder retStruct;
+    retStruct.image = bigimage;
+    retStruct.min_lat = min_lat;
+    retStruct.max_lat = max_lat;
+    retStruct.min_lon = min_lon;
+    retStruct.max_lon = max_lon;
+    return retStruct;
+}
+
+ImageWithBorder Map::_stitchViewImages(StitchTileInfo tilesInfo)
+{
+    int ntiles = 5;
+    int bigsize = ntiles * _TILESIZE;
+    QPixmap bigimage(bigsize, bigsize);
+    QPainter painter(&bigimage);
+    double min_lat = _centerLat;
+    double max_lat = _centerLat;
+    double min_lon = _centerLon;
+    double max_lon = _centerLon;
+
+    for (int i =0; i<ntiles*ntiles; i++)
+    {
+        int row_num = int(i/ntiles);
+        int col_num = i%ntiles;
 
         int x_ind = tilesInfo.localTiles.at(i).x;
         int y_ind = tilesInfo.localTiles.at(i).y;
@@ -646,6 +866,43 @@ QList<TileIndex> Map::sortTiles(StitchTileInfo tilesInfo)
     return sortedTiles;
 }
 
+QList<TileIndex> Map::sortViewTiles(StitchTileInfo tilesInfo)
+{
+    int ntiles = 5;
+    QList<TileIndex> allTiles;
+    QList<TileIndex> sortedTiles;
+    foreach (TileIndex tempTile, tilesInfo.localTiles) {
+        allTiles.append(tempTile);
+    }
+    foreach (TileIndex tempTile, tilesInfo.missingTiles) {
+        allTiles.append(tempTile);
+    }
+
+    QList<int> tempListX, tempListY;
+    foreach (TileIndex tempTile, allTiles) {
+        tempListX.append(tempTile.x);
+        tempListY.append(tempTile.y);
+    }
+    QSet<int> tempSetX = QSet<int>::fromList(tempListX);
+    QSet<int> tempSetY = QSet<int>::fromList(tempListY);
+    QList<int> tempListXR = QList<int>::fromSet(tempSetX);
+    QList<int> tempListYR = QList<int>::fromSet(tempSetY);
+    std::sort(tempListXR.begin(), tempListXR.end(), std::less<int>());
+    std::sort(tempListYR.begin(), tempListYR.end(), std::less<int>());
+    int level = allTiles.at(0).zoomlevel;
+    for (int i =0; i<ntiles*ntiles; i++)
+    {
+        int row_num = int(i/ntiles);
+        int col_num = i%ntiles;
+        TileIndex tempIndex;
+        tempIndex.x = tempListXR[col_num];
+        tempIndex.y = tempListYR[4-row_num];
+        tempIndex.zoomlevel = level;
+        sortedTiles.append(tempIndex);
+    }
+    return sortedTiles;
+}
+
 ImageWithBorder Map::_stitchImagesF(StitchTileInfo tilesInfo)
 {
     int ntiles = 3;
@@ -715,6 +972,75 @@ ImageWithBorder Map::_stitchImagesF(StitchTileInfo tilesInfo)
     return retStruct;
 }
 
+ImageWithBorder Map::_stitchViewImagesF(StitchTileInfo tilesInfo)
+{
+    int ntiles = 5;
+    int bigsize = ntiles * _TILESIZE;
+    QList<TileIndex> sortedTiles = sortViewTiles(tilesInfo);
+    QPixmap bigimage(bigsize, bigsize);
+    QPainter painter(&bigimage);
+    double min_lat = _centerLat;
+    double max_lat = _centerLat;
+    double min_lon = _centerLon;
+    double max_lon = _centerLon;
+
+    for (int i =0; i<ntiles*ntiles; i++)
+    {
+        int row_num = int(i/ntiles);
+        int col_num = i%ntiles;
+
+        int x_ind = sortedTiles.at(i).x;
+        int y_ind = sortedTiles.at(i).y;
+
+        double lat = geoDictList.at(_zoomlevel-9).latList.at(y_ind);
+        double lon = geoDictList.at(_zoomlevel-9).lonList.at(x_ind);
+        double lat_rounded = _round_to(lat,6);
+        double lon_rounded = _round_to(lon,6);
+        //qDebug() << qSetRealNumberPrecision( 10 ) << x_ind << y_ind << lat << lon;
+        if (lat_rounded > max_lat)
+        {
+            max_lat = lat_rounded;
+        }
+        if (lat_rounded < min_lat)
+        {
+            min_lat = lat_rounded;
+        }
+        if (lon_rounded > max_lon)
+        {
+            max_lon = lon_rounded;
+        }
+        if (lon_rounded < min_lon)
+        {
+            min_lon = lon_rounded;
+        }
+        QString strLat = QString::number(lat_rounded, 'f', 6);
+        QString strLon = QString::number(lon_rounded, 'f', 6);
+        QString strZoomLevel = QString::number(_zoomlevel, 10);
+        QString strWidth = QString::number(_width, 10);
+        QString strHeight = QString::number(_height, 10);
+        QString tempName = strLat+"_"+strLon+"_"+strZoomLevel+"_"+_maptype+"_"+strWidth+"_"+strHeight+".jpg";
+
+        QPixmap tile;
+        if (!QFileInfo(cacheFolder + tempName).exists())
+        {
+            tile.load(resourcePath + "/res/black.jpg");
+        }
+        else
+        {
+            tile.load(cacheFolder + tempName);
+        }
+
+        painter.drawPixmap(col_num *_TILESIZE, row_num *_TILESIZE, tile);
+    }
+    ImageWithBorder retStruct;
+    retStruct.image = bigimage;
+    retStruct.min_lat = min_lat;
+    retStruct.max_lat = max_lat;
+    retStruct.min_lon = min_lon;
+    retStruct.max_lon = max_lon;
+    return retStruct;
+}
+
 QPixmap Map::_cropImage(ImageWithBorder imageAndBorder)
 {
     double image_center_lat = (imageAndBorder.max_lat + imageAndBorder.min_lat)/2.0;
@@ -731,13 +1057,30 @@ QPixmap Map::_cropImage(ImageWithBorder imageAndBorder)
     return tempCropImage;
 }
 
+QPixmap Map::_cropViewImage(ImageWithBorder imageAndBorder)
+{
+    double image_center_lat = (imageAndBorder.max_lat + imageAndBorder.min_lat)/2.0;
+    double image_center_lon = (imageAndBorder.max_lon + imageAndBorder.min_lon)/2.0;
+    double tile_length_lat = (imageAndBorder.max_lat - imageAndBorder.min_lat)/2.0;
+    double tile_length_lon = (imageAndBorder.max_lon - imageAndBorder.min_lon)/2.0;
+    int dx = int(640*(_centerLon - image_center_lon)/tile_length_lon);
+    int dy = int(640*(_centerLat - image_center_lat)/tile_length_lat);
+    int northwest_x = 640 + dx;
+    int northwest_y = 640 - dy;
+    QPixmap tempCropImage;
+    int gain = qPow(2, _zoomlevel - _viewlevel);
+    tempCropImage = imageAndBorder.image.copy(northwest_x, northwest_y, 640*gain, 640*gain);
+    //tempCropImage = imageAndBorder.image.copy(640,640,640,640);
+    return tempCropImage;
+}
 
 void Map::_reload(AutoZoomGeoMapInfo mapInfo)
 {
     _centerLat = mapInfo._center_lat;
     _centerLon = mapInfo._center_lon;
     _zoomlevel = mapInfo._zoomlevel;
-    loadImage();
+    //loadImage();
+    loadViewImage();
 }
 
 AutoZoomGeoMapInfo Map::_find_zoomlevel(double min_lat, double max_lat, double min_lon, double max_lon)
@@ -784,7 +1127,8 @@ void Map::return_origin()
 {
     _centerLat = _originLat;
     _centerLon = _originLon;
-    loadImage();
+    //loadImage();
+    loadViewImage();
 }
 
 // This function is used to translate GPS coordinates to

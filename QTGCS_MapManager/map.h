@@ -137,6 +137,7 @@ public:
     QString cacheIndex;
     QString mapKey;
     QPixmap retImage;
+    QPixmap retViewImage;
 
     //GeoDict latlonDict;
     QList<LevelDict> geoDictList;
@@ -153,6 +154,7 @@ public:
     GPSCoordinate PostoGPS(PixelPosition);
 
     void loadImage();
+    void loadViewImage();
     void _init_tile_index();
     TileIndex _pos_to_tile_index(double, double, int);
 
@@ -170,14 +172,21 @@ public:
     void _grab_tile(double, double, int, QString);
 
     StitchTileInfo localLoadImage();
+    StitchTileInfo localLoadViewImage();
     StitchTileInfo _findLocalImage();
     StitchTileInfo _findImages(QList<CacheAreaInfo>);
+    StitchTileInfo _findLocalViewImage();
+    StitchTileInfo _findViewImages(QList<CacheAreaInfo>);
     ImageWithBorder _stitchImages(StitchTileInfo);
     ImageWithBorder _stitchImagesF(StitchTileInfo);
+    ImageWithBorder _stitchViewImages(StitchTileInfo);
+    ImageWithBorder _stitchViewImagesF(StitchTileInfo);
     QPixmap _cropImage(ImageWithBorder);
+    QPixmap _cropViewImage(ImageWithBorder);
     void webLoadImage(StitchTileInfo);
     void _downloadTile(TileIndex);
     QList<TileIndex> sortTiles(StitchTileInfo tilesInfo);
+    QList<TileIndex> sortViewTiles(StitchTileInfo tilesInfo);
 
     void _getBigImage();
     void _new_image();
