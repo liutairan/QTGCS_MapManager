@@ -13,6 +13,10 @@
   <property name="windowTitle">
    <string>QTGCS Map Manager</string>
   </property>
+  <property name="windowIcon">
+   <iconset>
+    <normaloff>QTGCS.icns</normaloff>QTGCS.icns</iconset>
+  </property>
   <widget class="QWidget" name="centralWidget">
    <widget class="QLabel" name="mapLabel">
     <property name="geometry">

@@ -12,6 +12,7 @@ greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
 TARGET = QTGCS_MapManager
 TEMPLATE = app
+ICON = QTGCS.icns
 
 # The following define makes your compiler emit warnings if you use
 # any feature of Qt which has been marked as deprecated (the exact warnings
@@ -29,12 +30,12 @@ SOURCES += \
         main.cpp \
         mainwindow.cpp \
         map.cpp \
-    fileio.cpp
+        fileio.cpp
 
 HEADERS += \
         mainwindow.h \
         map.h \
-    fileio.h
+        fileio.h
 
 FORMS += \
         mainwindow.ui
