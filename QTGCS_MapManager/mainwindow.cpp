@@ -152,11 +152,20 @@ void MainWindow::on_returnButton_clicked()
 void MainWindow::on_currentLevelSlider_valueChanged(int value)
 {
     ui->currentLevelLabel->setText("C. L.\n  "+QString::number(value,10));
+    if (value - ui->manageLevelSlider->value() < -3)
+    {
+        ui->manageLevelSlider->setValue(value+3);
+    }
+    if (value - ui->manageLevelSlider->value() > 0)
+    {
+        ui->manageLevelSlider->setValue(value);
+    }
     emit paintRequest();
 }
 
 void MainWindow::on_manageLevelSlider_valueChanged(int value)
 {
+    int currentManageLevel = mapHandle->_zoomlevel;
     ui->manageLevelLabel->setText("M. L.\n  "+QString::number(value,10));
     if (value - ui->currentLevelSlider->value() < 0)
     {
@@ -165,6 +174,10 @@ void MainWindow::on_manageLevelSlider_valueChanged(int value)
     if (value - ui->currentLevelSlider->value() > 3)
     {
         ui->currentLevelSlider->setValue(value-3);
+    }
+    if ((value >=9) && (value <=21))
+    {
+        mapHandle->zoom(value-currentManageLevel);
     }
     emit paintRequest();
 }
