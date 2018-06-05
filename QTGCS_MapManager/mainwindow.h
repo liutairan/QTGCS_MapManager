@@ -10,6 +10,7 @@
 #include <QJsonDocument>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QMessageBox>
 
 #include "fileio.h"
 #include "map.h"
