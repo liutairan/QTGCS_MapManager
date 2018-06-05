@@ -5,7 +5,10 @@ Map::Map(double lat, double lon, int level, int width, int height, QObject *pare
 {
     _width = width;
     _height = height;
+    viewWidth = width;
+    viewHeight = height;
     _zoomlevel = level;
+    _viewlevel = level;
     _homeLat = lat;
     _homeLon = lon;
     _centerLat = lat;
@@ -95,6 +98,20 @@ void Map::zoom(int dlevel)
     loadImage();
 }
 
+void Map::viewZoom(int dlevel)
+{
+    _viewlevel = _viewlevel + dlevel;
+    if (_viewlevel > 21)
+    {
+        _viewlevel = 21;
+    }
+    else if (_viewlevel < 9)
+    {
+        _viewlevel = 9;
+    }
+    qDebug() << _viewlevel;
+}
+
 void Map::loadImage()
 {
     QStringList filters;
@@ -118,8 +135,9 @@ void Map::loadImage()
         else if (tempTileInfo.missingTiles.length() > 0)
         {
             //qDebug() << "Not exist";
-            webLoadImage(tempTileInfo);
-            localLoadImage();
+            // Comment out web download image for testing, change back later
+            //webLoadImage(tempTileInfo);
+            StitchTileInfo dump = localLoadImage();
         }
         else
         {
@@ -135,6 +153,10 @@ StitchTileInfo Map::localLoadImage()
     StitchTileInfo tempTileInfo = _findLocalImage();
     if(tempTileInfo.missingTiles.length() > 0)
     {
+        // Some tiles not exist locally, fill with black image temporarily
+        ImageWithBorder tempImageAndBorder = _stitchImagesF(tempTileInfo);
+        QPixmap tempImage = _cropImage(tempImageAndBorder);
+        retImage = tempImage;
         return tempTileInfo;
     }
     else if (tempTileInfo.localTiles.length() == 9)
@@ -324,10 +346,12 @@ void Map::_init_tile_index()
             tempLonSet << longitude;
         }
         QList<double> tempLatList = QList<double>::fromSet(tempLatSet);
-        qSort(tempLatList);
+        //qSort(tempLatList);
+        std::sort(tempLatList.begin(), tempLatList.end(), std::less<double>());
         tempLevelDict.latList = tempLatList;
         QList<double> tempLonList = QList<double>::fromSet(tempLonSet);
-        qSort(tempLonList);
+        //qSort(tempLonList);
+        std::sort(tempLonList.begin(), tempLonList.end(), std::less<double>());
         tempLevelDict.lonList = tempLonList;
 
         /*
@@ -536,6 +560,7 @@ ImageWithBorder Map::_stitchImages(StitchTileInfo tilesInfo)
     double max_lat = _centerLat;
     double min_lon = _centerLon;
     double max_lon = _centerLon;
+
     for (int i =0; i<9; i++)
     {
         int row_num = int(i/3);
@@ -574,6 +599,111 @@ ImageWithBorder Map::_stitchImages(StitchTileInfo tilesInfo)
 
         QPixmap tile;
         tile.load(cacheFolder + tempName);
+        painter.drawPixmap(col_num *_TILESIZE, row_num *_TILESIZE, tile);
+    }
+    ImageWithBorder retStruct;
+    retStruct.image = bigimage;
+    retStruct.min_lat = min_lat;
+    retStruct.max_lat = max_lat;
+    retStruct.min_lon = min_lon;
+    retStruct.max_lon = max_lon;
+    return retStruct;
+}
+
+QList<TileIndex> Map::sortTiles(StitchTileInfo tilesInfo)
+{
+    QList<TileIndex> allTiles;
+    QList<TileIndex> sortedTiles;
+    foreach (TileIndex tempTile, tilesInfo.localTiles) {
+        allTiles.append(tempTile);
+    }
+    foreach (TileIndex tempTile, tilesInfo.missingTiles) {
+        allTiles.append(tempTile);
+    }
+
+    QList<int> tempListX, tempListY;
+    foreach (TileIndex tempTile, allTiles) {
+        tempListX.append(tempTile.x);
+        tempListY.append(tempTile.y);
+    }
+    QSet<int> tempSetX = QSet<int>::fromList(tempListX);
+    QSet<int> tempSetY = QSet<int>::fromList(tempListY);
+    QList<int> tempListXR = QList<int>::fromSet(tempSetX);
+    QList<int> tempListYR = QList<int>::fromSet(tempSetY);
+    std::sort(tempListXR.begin(), tempListXR.end(), std::less<int>());
+    std::sort(tempListYR.begin(), tempListYR.end(), std::less<int>());
+    int level = allTiles.at(0).zoomlevel;
+    for (int i =0; i<9; i++)
+    {
+        int row_num = int(i/3);
+        int col_num = i%3;
+        TileIndex tempIndex;
+        tempIndex.x = tempListXR[col_num];
+        tempIndex.y = tempListYR[2-row_num];
+        tempIndex.zoomlevel = level;
+        sortedTiles.append(tempIndex);
+    }
+    return sortedTiles;
+}
+
+ImageWithBorder Map::_stitchImagesF(StitchTileInfo tilesInfo)
+{
+    int ntiles = 3;
+    int bigsize = ntiles * _TILESIZE;
+    QList<TileIndex> sortedTiles = sortTiles(tilesInfo);
+    QPixmap bigimage(bigsize, bigsize);
+    QPainter painter(&bigimage);
+    double min_lat = _centerLat;
+    double max_lat = _centerLat;
+    double min_lon = _centerLon;
+    double max_lon = _centerLon;
+
+    for (int i =0; i<9; i++)
+    {
+        int row_num = int(i/3);
+        int col_num = i%3;
+
+        int x_ind = sortedTiles.at(i).x;
+        int y_ind = sortedTiles.at(i).y;
+
+        double lat = geoDictList.at(_zoomlevel-9).latList.at(y_ind);
+        double lon = geoDictList.at(_zoomlevel-9).lonList.at(x_ind);
+        double lat_rounded = _round_to(lat,6);
+        double lon_rounded = _round_to(lon,6);
+        //qDebug() << qSetRealNumberPrecision( 10 ) << x_ind << y_ind << lat << lon;
+        if (lat_rounded > max_lat)
+        {
+            max_lat = lat_rounded;
+        }
+        if (lat_rounded < min_lat)
+        {
+            min_lat = lat_rounded;
+        }
+        if (lon_rounded > max_lon)
+        {
+            max_lon = lon_rounded;
+        }
+        if (lon_rounded < min_lon)
+        {
+            min_lon = lon_rounded;
+        }
+        QString strLat = QString::number(lat_rounded, 'f', 6);
+        QString strLon = QString::number(lon_rounded, 'f', 6);
+        QString strZoomLevel = QString::number(_zoomlevel, 10);
+        QString strWidth = QString::number(_width, 10);
+        QString strHeight = QString::number(_height, 10);
+        QString tempName = strLat+"_"+strLon+"_"+strZoomLevel+"_"+_maptype+"_"+strWidth+"_"+strHeight+".jpg";
+
+        QPixmap tile;
+        if (!QFileInfo(cacheFolder + tempName).exists())
+        {
+            tile.load(resourcePath + "/res/black.jpg");
+        }
+        else
+        {
+            tile.load(cacheFolder + tempName);
+        }
+
         painter.drawPixmap(col_num *_TILESIZE, row_num *_TILESIZE, tile);
     }
     ImageWithBorder retStruct;

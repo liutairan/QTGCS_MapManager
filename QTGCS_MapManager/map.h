@@ -118,7 +118,10 @@ class Map : public QObject
 public:
     Map(double, double, int, int, int, QObject *parent = 0);
 
+    int viewWidth;
+    int viewHeight;
     int _zoomlevel;
+    int _viewlevel;
 
     int _iterationX;
     int _iterationY;
@@ -143,6 +146,7 @@ public:
     void initLoad();
     void move(int,int);
     void zoom(int);
+    void viewZoom(int);
     void _reload(AutoZoomGeoMapInfo);
     void return_origin();
     PixelPosition GPStoImagePos(GPSCoordinate);
@@ -169,9 +173,11 @@ public:
     StitchTileInfo _findLocalImage();
     StitchTileInfo _findImages(QList<CacheAreaInfo>);
     ImageWithBorder _stitchImages(StitchTileInfo);
+    ImageWithBorder _stitchImagesF(StitchTileInfo);
     QPixmap _cropImage(ImageWithBorder);
     void webLoadImage(StitchTileInfo);
     void _downloadTile(TileIndex);
+    QList<TileIndex> sortTiles(StitchTileInfo tilesInfo);
 
     void _getBigImage();
     void _new_image();

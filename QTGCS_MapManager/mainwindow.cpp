@@ -93,8 +93,8 @@ void MainWindow::draw(QPainter *painter)
     QPen BlueLine((QColor::fromRgb(0,0,255)),1);
     painter->setPen(GreenLine);
     QVector<QPoint> ppVector;
-    int divider = 8;
-    int spacer = 640/divider;
+    uint divider = 8;
+    uint spacer = 640/divider;
     for (uint i = 0; i<=divider; i++)
     {
         ppVector.append(QPoint(i*spacer, 0));
@@ -151,6 +151,7 @@ void MainWindow::on_returnButton_clicked()
 
 void MainWindow::on_currentLevelSlider_valueChanged(int value)
 {
+    int currentViewLevel = mapHandle->_viewlevel;
     ui->currentLevelLabel->setText("C. L.\n  "+QString::number(value,10));
     if (value - ui->manageLevelSlider->value() < -3)
     {
@@ -159,6 +160,10 @@ void MainWindow::on_currentLevelSlider_valueChanged(int value)
     if (value - ui->manageLevelSlider->value() > 0)
     {
         ui->manageLevelSlider->setValue(value);
+    }
+    if ((value >=9) && (value <=21))
+    {
+        mapHandle->viewZoom(value-currentViewLevel);
     }
     emit paintRequest();
 }
