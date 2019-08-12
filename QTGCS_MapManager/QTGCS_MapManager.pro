@@ -39,3 +39,6 @@ HEADERS += \
 
 FORMS += \
         mainwindow.ui
+
+#QMAKE_MAC_SDK = macosx10.14
+#QMAKE_MACOSX_DEPLOYMENT_TARGET = 10.13.4
